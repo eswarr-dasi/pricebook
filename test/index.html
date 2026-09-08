@@ -11,224 +11,336 @@
     h1 { font-size: 18px; }
     h2 { font-size: 14px; margin: 20px 0 6px; }
     #summary { margin: 16px 0; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+    #env { color: #555; margin-bottom: 12px; }
+    pre { white-space: pre-wrap; }
   </style>
 </head>
 <body>
   <h1>Price Book tests</h1>
-  <p>No test runner, no npm. Serve the repo and open this page.</p>
+  <p>No test runner, no npm. Serve the repo and open this page over http, not by
+     double clicking the file. Modules will not load from a file:// URL.</p>
   <div id="summary">running...</div>
+  <div id="env"></div>
   <div id="out"></div>
 
-  <script type="module">
-    import * as M from '../src/metrics.js';
-    import * as EAN from '../src/ean.js';
-    import { normalize, isValidEan13, toKrogerProductId, checkDigit, digitsOnly } from '../src/barcode.js';
-
-    const out = document.getElementById('out');
-    let pass = 0;
-    let fail = 0;
-
-    function section(title) {
-      const h = document.createElement('h2');
-      h.textContent = title;
-      out.appendChild(h);
-    }
-    function log(ok, name, detail) {
-      const div = document.createElement('div');
-      div.className = ok ? 'pass' : 'fail';
-      div.textContent = (ok ? 'PASS  ' : 'FAIL  ') + name + (detail ? '   ' + detail : '');
-      out.appendChild(div);
-      if (ok) pass++; else fail++;
-    }
-    function eq(name, actual, expected) {
-      const ok = actual === expected;
-      log(ok, name, ok ? '' : 'got ' + JSON.stringify(actual) + ' want ' + JSON.stringify(expected));
-    }
-    function near(name, actual, expected, tol) {
-      const t = tol == null ? 0.01 : tol;
-      const ok = actual != null && Math.abs(actual - expected) <= t;
-      log(ok, name, ok ? '' : 'got ' + actual + ' want ' + expected + ' +/- ' + t);
-    }
-
-    section('Barcode normalization');
-    eq('digitsOnly strips junk', digitsOnly('  038-000 138416 '), '038000138416');
-    eq('UPC-A is padded to EAN-13', normalize('038000138416'), '0038000138416');
-    eq('EAN-13 passes through', normalize('0038000138416'), '0038000138416');
-    eq('EAN-8 passes through', normalize('96385074'), '96385074');
-    eq('GTIN-14 drops the indicator', normalize('10038000138416'), '0038000138416');
-    eq('nonsense is rejected', normalize('12345'), null);
-    eq('empty is rejected', normalize(''), null);
-    eq('check digit is computed', checkDigit('003800013841'), 6);
-    eq('real barcode validates', isValidEan13('0038000138416'), true);
-    eq('corrupted barcode fails', isValidEan13('0038000138417'), false);
-    eq('Kroger id omits the check digit', toKrogerProductId('0038000138416'), '0003800013841');
-    eq('Kroger id is 13 digits', toKrogerProductId('0038000138416').length, 13);
-
-    section('Quantity parsing');
-    near('ounces to grams', M.parseQuantity('5.2 oz'), 147.42, 0.01);
-    near('pounds to grams', M.parseQuantity('2 lb'), 907.18, 0.01);
-    near('fluid ounces to ml', M.parseQuantity('12 fl oz'), 354.88, 0.01);
-    eq('kilograms to grams', M.parseQuantity('1.5 kg'), 1500);
-    eq('litres to ml', M.parseQuantity('1,5 l'), 1500);
-    eq('grams stay grams', M.parseQuantity('500 g'), 500);
-    eq('serving text is parsed', M.parseQuantity('1 serving (28 g)'), 28);
-    eq('unparseable size is null', M.parseQuantity('one packet'), null);
-    eq('missing size is null', M.parseQuantity(''), null);
-
-    section('Value metrics, real Open Food Facts record 0038000138416');
-    const pringles = {
-      code: '0038000138416',
-      product_name: 'Original Potato Crisps',
-      brands: 'Pringles',
-      quantity: '5.2 oz',
-      product_quantity: 147.41752025,
-      serving_size: '1 serving (28 g)',
-      serving_quantity: 28,
-      nutriments: {
-        'energy-kcal_100g': 536,
-        proteins_100g: 3.5,
-        fiber_100g: 4,
-        fat_100g: 32,
-        carbohydrates_100g: 57,
-        sugars_100g: 1,
-        salt_100g: 1.34,
-        'saturated-fat_100g': 9
+  <script>
+    // Classic script, deliberately first. It exists so that a failure which
+    // happens before or outside the test module still puts something on the
+    // page. The old version of this file could sit on "running..." forever with
+    // the only clue in the console.
+    (function () {
+      function shout(msg) {
+        var s = document.getElementById("summary");
+        if (!s) return;
+        s.className = "fail";
+        s.textContent = msg;
       }
-    };
-    near('package grams', M.packageGrams(pringles), 147.42, 0.01);
-    eq('serving grams', M.servingGrams(pringles), 28);
-    near('servings per package', M.servingsPerPackage(pringles), 5.26, 0.01);
-
-    const c = M.compute(pringles, 4.29, { household: 1 });
-    near('cost per serving', c.costPerServing, 0.815, 0.002);
-    near('cost per 100 g', c.costPer100g, 2.91, 0.01);
-    near('protein in package', c.totalProtein, 5.16, 0.01);
-    near('cents per gram of protein', c.costPerGramProtein * 100, 83.1, 0.2);
-    near('calories in package', c.totalKcal, 790, 1);
-    near('calories per dollar', c.kcalPerDollar, 184, 1);
-    eq('nothing is missing for this fixture', c.missing.length, 0);
-
-    const sat = M.satiety(pringles);
-    eq('satiety is always flagged as an estimate', sat.isEstimate, true);
-    near('satiety score', sat.score, 13, 1);
-    log(sat.low < sat.score && sat.high > sat.score, 'satiety carries an uncertainty range',
-        sat.low + ' to ' + sat.high);
-    eq('satiety exposes its energy density input', sat.inputs.energyDensity, 5.36);
-    eq('satiety exposes its protein input', sat.inputs.protein, 3.5);
-    eq('satiety exposes its fiber input', sat.inputs.fiber, 4);
-    near('fullness per dollar', c.fullnessPerDollar, 16, 1);
-
-    const c4 = M.compute(pringles, 4.29, { household: 4 });
-    near('cost to feed four', c4.costForHousehold, c.costPerServing * 4, 0.002);
-
-    section('Missing data must never become an invented number');
-    const bare = { code: '1', nutriments: {} };
-    const cb = M.compute(bare, 3.0, {});
-    eq('no serving size means no cost per serving', cb.costPerServing, null);
-    eq('no protein means no protein price', cb.costPerGramProtein, null);
-    eq('no nutrition means no satiety estimate', cb.satiety, null);
-    log(cb.missing.length >= 4, 'missing inputs are reported', cb.missing.join(', '));
-    eq('a null number formats as a dash, not a zero', M.money(null), M.DASH);
-    eq('a real number formats as money', M.money(0.8149), '$0.81');
-    const noPrice = M.compute(pringles, null, {});
-    eq('no price means no cost per serving', noPrice.costPerServing, null);
-    eq('no price still gives nutrition', noPrice.per100.protein, 3.5);
-
-    section('Barcode decoder, generated frames');
-    // Renders a barcode to a canvas and hands the pixels to the decoder. This is
-    // a real round trip: the encoder was itself checked against the platform
-    // BarcodeDetector, which read 0038000138416 back from these exact bits.
-    function frame(bits, opts) {
-      const o = Object.assign({ m: 3, h: 140, q: 10, rotate: 0, blur: 0, noise: 0, gradient: 0 }, opts || {});
-      const bar = document.createElement('canvas');
-      bar.width = (bits.length + o.q * 2) * o.m;
-      bar.height = o.h;
-      const bg = bar.getContext('2d');
-      bg.fillStyle = '#fff';
-      bg.fillRect(0, 0, bar.width, bar.height);
-      bg.fillStyle = '#000';
-      for (let i = 0; i < bits.length; i++) {
-        if (bits[i] === '1') bg.fillRect((i + o.q) * o.m, 0, o.m, o.h);
-      }
-      const W = Math.round(bar.width * 1.4);
-      const H = Math.round(bar.height * 2.2);
-      const cv = document.createElement('canvas');
-      cv.width = W;
-      cv.height = H;
-      const g = cv.getContext('2d');
-      g.fillStyle = '#fff';
-      g.fillRect(0, 0, W, H);
-      g.save();
-      g.translate(W / 2, H / 2);
-      g.rotate((o.rotate * Math.PI) / 180);
-      if (o.blur) g.filter = 'blur(' + o.blur + 'px)';
-      g.drawImage(bar, -bar.width / 2, -bar.height / 2);
-      g.restore();
-      if (o.gradient) {
-        g.filter = 'none';
-        const grad = g.createLinearGradient(0, 0, W, 0);
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(0,0,0,' + o.gradient + ')');
-        g.fillStyle = grad;
-        g.fillRect(0, 0, W, H);
-      }
-      const id = g.getImageData(0, 0, W, H);
-      if (o.noise) {
-        const d = id.data;
-        for (let i = 0; i < d.length; i += 4) {
-          const n = (Math.random() * 2 - 1) * o.noise;
-          d[i] = Math.max(0, Math.min(255, d[i] + n));
-          d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
-          d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
-        }
-      }
-      return id;
-    }
-    function withCheck(base12) {
-      let s = 0;
-      for (let i = 0; i < 12; i++) s += Number(base12[i]) * (i % 2 === 0 ? 1 : 3);
-      return base12 + String((10 - (s % 10)) % 10);
-    }
-    function readBack(code, opts) {
-      const r = EAN.decodeFrame(frame(EAN.encodeEan13(code), opts), { rows: 9, budgetMs: 200 });
-      return r ? r.code : null;
-    }
-
-    eq('EAN-13 is 95 modules', EAN.encodeEan13('0038000138416').length, 95);
-    eq('EAN-8 is 67 modules', EAN.encodeEan8('96385074').length, 67);
-    eq('check digit accepts a real barcode', EAN.checkDigitOk('0038000138416'), true);
-    eq('check digit rejects a corrupted one', EAN.checkDigitOk('0038000138417'), false);
-
-    ['0038000138416', '0012000001086', '0049000042566', '9780306406157', '4006381333931']
-      .forEach(function (code) {
-        eq('decodes ' + code, readBack(code, {}), code);
+      window.addEventListener("error", function (e) {
+        shout("FAILED before the tests finished: " + (e.message || "script error") +
+          (e.filename ? "  (" + e.filename + ")" : ""));
       });
+      window.addEventListener("unhandledrejection", function (e) {
+        var r = e.reason;
+        shout("FAILED before the tests finished: " + ((r && r.message) || r));
+      });
+      // Watchdog. If the module never reaches its own summary line, say so
+      // rather than pretending work is still happening.
+      setTimeout(function () {
+        var s = document.getElementById("summary");
+        if (s && s.textContent === "running...") {
+          shout("Nothing reported after 10 seconds. The test module never ran. " +
+            "Check the console: the usual causes are a file:// URL, a server " +
+            "started in the wrong directory, or a missing file under src/.");
+        }
+      }, 10000);
+    })();
+  </script>
 
-    let randomOk = 0;
-    const RANDOM_N = 30;
-    for (let i = 0; i < RANDOM_N; i++) {
-      let base = '';
-      for (let k = 0; k < 12; k++) base += Math.floor(Math.random() * 10);
-      const code = withCheck(base);
-      if (readBack(code, { m: 2, h: 100 }) === code) randomOk++;
+  <script type="module">
+    const summary = document.getElementById("summary");
+
+    function fatal(where, e) {
+      summary.className = "fail";
+      summary.textContent = "FAILED " + where + ": " + ((e && e.message) || e);
+      const pre = document.createElement("pre");
+      pre.className = "fail";
+      pre.textContent = (e && e.stack) || "";
+      document.getElementById("out").appendChild(pre);
     }
-    eq(RANDOM_N + ' random barcodes round trip', randomOk, RANDOM_N);
 
-    eq('decodes an EAN-8',
-       (EAN.decodeFrame(frame(EAN.encodeEan8('96385074'), {}), { rows: 9, budgetMs: 200 }) || {}).code,
-       '96385074');
-    eq('decodes upside down', readBack('0038000138416', { rotate: 180 }), '0038000138416');
-    eq('decodes tilted 15 degrees', readBack('0038000138416', { rotate: 15 }), '0038000138416');
-    eq('decodes short bars tilted 15 degrees', readBack('0038000138416', { h: 30, rotate: 15 }), '0038000138416');
-    eq('decodes with one pixel modules', readBack('0038000138416', { m: 1, h: 60 }), '0038000138416');
-    eq('decodes through uneven lighting', readBack('0038000138416', { gradient: 0.55 }), '0038000138416');
-    eq('decodes with blur, noise and a shadow', readBack('0038000138416', { gradient: 0.45, blur: 1, noise: 30 }), '0038000138416');
-    eq('blank frame decodes to nothing',
-       EAN.decodeFrame(frame('0'.repeat(95), {}), { rows: 5, budgetMs: 100 }), null);
+    // Every export the tests below actually call. Checked up front so a rename
+    // in src/ reports itself by name instead of throwing "not a function"
+    // halfway through a run.
+    const WANTED = {
+      "metrics.js": ["parseQuantity", "packageGrams", "servingGrams", "servingsPerPackage",
+                     "compute", "satiety", "money", "DASH"],
+      "ean.js": ["decodeFrame", "encodeEan13", "encodeEan8", "checkDigitOk"],
+      "barcode.js": ["normalize", "isValidEan13", "toKrogerProductId", "checkDigit",
+                     "digitsOnly", "scanMode"]
+    };
 
-    const s = document.getElementById('summary');
-    s.textContent = pass + ' passed, ' + fail + ' failed';
-    s.className = fail ? 'fail' : 'pass';
+    async function main() {
+      if (location.protocol === "file:") {
+        fatal("before starting", new Error(
+          "this page was opened as a file:// URL and ES modules cannot load that " +
+          "way. Serve the repository root instead: python3 -m http.server 8080, " +
+          "then open http://localhost:8080/test/index.html"));
+        return;
+      }
+
+      // Imported one at a time so the error names the file that failed. Static
+      // imports at the top of the module would fail in the network layer,
+      // before any of this code exists to report it.
+      let M, EAN, B;
+      try {
+        M = await import("../src/metrics.js");
+        EAN = await import("../src/ean.js");
+        B = await import("../src/barcode.js");
+      } catch (e) {
+        fatal("while loading a module", e);
+        return;
+      }
+
+      const mods = { "metrics.js": M, "ean.js": EAN, "barcode.js": B };
+      const missing = [];
+      Object.keys(WANTED).forEach(function (file) {
+        WANTED[file].forEach(function (name) {
+          if (typeof mods[file][name] === "undefined") missing.push(file + " has no " + name);
+        });
+      });
+      if (missing.length) {
+        fatal("checking exports", new Error(missing.join("; ")));
+        return;
+      }
+
+      const normalize = B.normalize;
+      const isValidEan13 = B.isValidEan13;
+      const toKrogerProductId = B.toKrogerProductId;
+      const checkDigit = B.checkDigit;
+      const digitsOnly = B.digitsOnly;
+
+      // Which decoder path this browser will use. The canvas tests below run
+      // the built in decoder either way, so a pass here on Chrome still says
+      // something about Safari.
+      document.getElementById("env").textContent =
+        "environment: " + location.protocol + "  secure context " +
+        (window.isSecureContext ? "yes" : "no") + "  BarcodeDetector " +
+        ("BarcodeDetector" in window ? "present" : "absent") +
+        "  camera path " + B.scanMode();
+
+      try {
+
+      const out = document.getElementById('out');
+      let pass = 0;
+      let fail = 0;
+
+      function section(title) {
+        const h = document.createElement('h2');
+        h.textContent = title;
+        out.appendChild(h);
+      }
+      function log(ok, name, detail) {
+        const div = document.createElement('div');
+        div.className = ok ? 'pass' : 'fail';
+        div.textContent = (ok ? 'PASS  ' : 'FAIL  ') + name + (detail ? '   ' + detail : '');
+        out.appendChild(div);
+        if (ok) pass++; else fail++;
+      }
+      function eq(name, actual, expected) {
+        const ok = actual === expected;
+        log(ok, name, ok ? '' : 'got ' + JSON.stringify(actual) + ' want ' + JSON.stringify(expected));
+      }
+      function near(name, actual, expected, tol) {
+        const t = tol == null ? 0.01 : tol;
+        const ok = actual != null && Math.abs(actual - expected) <= t;
+        log(ok, name, ok ? '' : 'got ' + actual + ' want ' + expected + ' +/- ' + t);
+      }
+
+      section('Barcode normalization');
+      eq('digitsOnly strips junk', digitsOnly('  038-000 138416 '), '038000138416');
+      eq('UPC-A is padded to EAN-13', normalize('038000138416'), '0038000138416');
+      eq('EAN-13 passes through', normalize('0038000138416'), '0038000138416');
+      eq('EAN-8 passes through', normalize('96385074'), '96385074');
+      eq('GTIN-14 drops the indicator', normalize('10038000138416'), '0038000138416');
+      eq('nonsense is rejected', normalize('12345'), null);
+      eq('empty is rejected', normalize(''), null);
+      eq('check digit is computed', checkDigit('003800013841'), 6);
+      eq('real barcode validates', isValidEan13('0038000138416'), true);
+      eq('corrupted barcode fails', isValidEan13('0038000138417'), false);
+      eq('Kroger id omits the check digit', toKrogerProductId('0038000138416'), '0003800013841');
+      eq('Kroger id is 13 digits', toKrogerProductId('0038000138416').length, 13);
+
+      section('Quantity parsing');
+      near('ounces to grams', M.parseQuantity('5.2 oz'), 147.42, 0.01);
+      near('pounds to grams', M.parseQuantity('2 lb'), 907.18, 0.01);
+      near('fluid ounces to ml', M.parseQuantity('12 fl oz'), 354.88, 0.01);
+      eq('kilograms to grams', M.parseQuantity('1.5 kg'), 1500);
+      eq('litres to ml', M.parseQuantity('1,5 l'), 1500);
+      eq('grams stay grams', M.parseQuantity('500 g'), 500);
+      eq('serving text is parsed', M.parseQuantity('1 serving (28 g)'), 28);
+      eq('unparseable size is null', M.parseQuantity('one packet'), null);
+      eq('missing size is null', M.parseQuantity(''), null);
+
+      section('Value metrics, real Open Food Facts record 0038000138416');
+      const pringles = {
+        code: '0038000138416',
+        product_name: 'Original Potato Crisps',
+        brands: 'Pringles',
+        quantity: '5.2 oz',
+        product_quantity: 147.41752025,
+        serving_size: '1 serving (28 g)',
+        serving_quantity: 28,
+        nutriments: {
+          'energy-kcal_100g': 536,
+          proteins_100g: 3.5,
+          fiber_100g: 4,
+          fat_100g: 32,
+          carbohydrates_100g: 57,
+          sugars_100g: 1,
+          salt_100g: 1.34,
+          'saturated-fat_100g': 9
+        }
+      };
+      near('package grams', M.packageGrams(pringles), 147.42, 0.01);
+      eq('serving grams', M.servingGrams(pringles), 28);
+      near('servings per package', M.servingsPerPackage(pringles), 5.26, 0.01);
+
+      const c = M.compute(pringles, 4.29, { household: 1 });
+      near('cost per serving', c.costPerServing, 0.815, 0.002);
+      near('cost per 100 g', c.costPer100g, 2.91, 0.01);
+      near('protein in package', c.totalProtein, 5.16, 0.01);
+      near('cents per gram of protein', c.costPerGramProtein * 100, 83.1, 0.2);
+      near('calories in package', c.totalKcal, 790, 1);
+      near('calories per dollar', c.kcalPerDollar, 184, 1);
+      eq('nothing is missing for this fixture', c.missing.length, 0);
+
+      const sat = M.satiety(pringles);
+      eq('satiety is always flagged as an estimate', sat.isEstimate, true);
+      near('satiety score', sat.score, 13, 1);
+      log(sat.low < sat.score && sat.high > sat.score, 'satiety carries an uncertainty range',
+          sat.low + ' to ' + sat.high);
+      eq('satiety exposes its energy density input', sat.inputs.energyDensity, 5.36);
+      eq('satiety exposes its protein input', sat.inputs.protein, 3.5);
+      eq('satiety exposes its fiber input', sat.inputs.fiber, 4);
+      near('fullness per dollar', c.fullnessPerDollar, 16, 1);
+
+      const c4 = M.compute(pringles, 4.29, { household: 4 });
+      near('cost to feed four', c4.costForHousehold, c.costPerServing * 4, 0.002);
+
+      section('Missing data must never become an invented number');
+      const bare = { code: '1', nutriments: {} };
+      const cb = M.compute(bare, 3.0, {});
+      eq('no serving size means no cost per serving', cb.costPerServing, null);
+      eq('no protein means no protein price', cb.costPerGramProtein, null);
+      eq('no nutrition means no satiety estimate', cb.satiety, null);
+      log(cb.missing.length >= 4, 'missing inputs are reported', cb.missing.join(', '));
+      eq('a null number formats as a dash, not a zero', M.money(null), M.DASH);
+      eq('a real number formats as money', M.money(0.8149), '$0.81');
+      const noPrice = M.compute(pringles, null, {});
+      eq('no price means no cost per serving', noPrice.costPerServing, null);
+      eq('no price still gives nutrition', noPrice.per100.protein, 3.5);
+
+      section('Barcode decoder, generated frames');
+      // Renders a barcode to a canvas and hands the pixels to the decoder. This is
+      // a real round trip: the encoder was itself checked against the platform
+      // BarcodeDetector, which read 0038000138416 back from these exact bits.
+      function frame(bits, opts) {
+        const o = Object.assign({ m: 3, h: 140, q: 10, rotate: 0, blur: 0, noise: 0, gradient: 0 }, opts || {});
+        const bar = document.createElement('canvas');
+        bar.width = (bits.length + o.q * 2) * o.m;
+        bar.height = o.h;
+        const bg = bar.getContext('2d');
+        bg.fillStyle = '#fff';
+        bg.fillRect(0, 0, bar.width, bar.height);
+        bg.fillStyle = '#000';
+        for (let i = 0; i < bits.length; i++) {
+          if (bits[i] === '1') bg.fillRect((i + o.q) * o.m, 0, o.m, o.h);
+        }
+        const W = Math.round(bar.width * 1.4);
+        const H = Math.round(bar.height * 2.2);
+        const cv = document.createElement('canvas');
+        cv.width = W;
+        cv.height = H;
+        const g = cv.getContext('2d');
+        g.fillStyle = '#fff';
+        g.fillRect(0, 0, W, H);
+        g.save();
+        g.translate(W / 2, H / 2);
+        g.rotate((o.rotate * Math.PI) / 180);
+        if (o.blur) g.filter = 'blur(' + o.blur + 'px)';
+        g.drawImage(bar, -bar.width / 2, -bar.height / 2);
+        g.restore();
+        if (o.gradient) {
+          g.filter = 'none';
+          const grad = g.createLinearGradient(0, 0, W, 0);
+          grad.addColorStop(0, 'rgba(0,0,0,0)');
+          grad.addColorStop(1, 'rgba(0,0,0,' + o.gradient + ')');
+          g.fillStyle = grad;
+          g.fillRect(0, 0, W, H);
+        }
+        const id = g.getImageData(0, 0, W, H);
+        if (o.noise) {
+          const d = id.data;
+          for (let i = 0; i < d.length; i += 4) {
+            const n = (Math.random() * 2 - 1) * o.noise;
+            d[i] = Math.max(0, Math.min(255, d[i] + n));
+            d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+            d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+          }
+        }
+        return id;
+      }
+      function withCheck(base12) {
+        let s = 0;
+        for (let i = 0; i < 12; i++) s += Number(base12[i]) * (i % 2 === 0 ? 1 : 3);
+        return base12 + String((10 - (s % 10)) % 10);
+      }
+      function readBack(code, opts) {
+        const r = EAN.decodeFrame(frame(EAN.encodeEan13(code), opts), { rows: 9, budgetMs: 200 });
+        return r ? r.code : null;
+      }
+
+      eq('EAN-13 is 95 modules', EAN.encodeEan13('0038000138416').length, 95);
+      eq('EAN-8 is 67 modules', EAN.encodeEan8('96385074').length, 67);
+      eq('check digit accepts a real barcode', EAN.checkDigitOk('0038000138416'), true);
+      eq('check digit rejects a corrupted one', EAN.checkDigitOk('0038000138417'), false);
+
+      ['0038000138416', '0012000001086', '0049000042566', '9780306406157', '4006381333931']
+        .forEach(function (code) {
+          eq('decodes ' + code, readBack(code, {}), code);
+        });
+
+      let randomOk = 0;
+      const RANDOM_N = 30;
+      for (let i = 0; i < RANDOM_N; i++) {
+        let base = '';
+        for (let k = 0; k < 12; k++) base += Math.floor(Math.random() * 10);
+        const code = withCheck(base);
+        if (readBack(code, { m: 2, h: 100 }) === code) randomOk++;
+      }
+      eq(RANDOM_N + ' random barcodes round trip', randomOk, RANDOM_N);
+
+      eq('decodes an EAN-8',
+         (EAN.decodeFrame(frame(EAN.encodeEan8('96385074'), {}), { rows: 9, budgetMs: 200 }) || {}).code,
+         '96385074');
+      eq('decodes upside down', readBack('0038000138416', { rotate: 180 }), '0038000138416');
+      eq('decodes tilted 15 degrees', readBack('0038000138416', { rotate: 15 }), '0038000138416');
+      eq('decodes short bars tilted 15 degrees', readBack('0038000138416', { h: 30, rotate: 15 }), '0038000138416');
+      eq('decodes with one pixel modules', readBack('0038000138416', { m: 1, h: 60 }), '0038000138416');
+      eq('decodes through uneven lighting', readBack('0038000138416', { gradient: 0.55 }), '0038000138416');
+      eq('decodes with blur, noise and a shadow', readBack('0038000138416', { gradient: 0.45, blur: 1, noise: 30 }), '0038000138416');
+      eq('blank frame decodes to nothing',
+         EAN.decodeFrame(frame('0'.repeat(95), {}), { rows: 5, budgetMs: 100 }), null);
+
+      const s = document.getElementById('summary');
+      s.textContent = pass + ' passed, ' + fail + ' failed';
+      s.className = fail ? 'fail' : 'pass';
+      } catch (e) {
+        fatal("during the tests", e);
+      }
+    }
+
+    main();
   </script>
 </body>
 </html>
