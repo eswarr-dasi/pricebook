@@ -4,6 +4,8 @@
 // one product has exactly one key in the price book and in the product cache.
 // Retailer specific transforms live here too, never in the UI.
 
+import { decodeFrame } from './ean.js';
+
 export function digitsOnly(raw) {
   return String(raw == null ? '' : raw).replace(/[^0-9]/g, '');
 }
@@ -44,38 +46,54 @@ export function supportsNativeScan() {
   return typeof window !== 'undefined' && 'BarcodeDetector' in window;
 }
 
+// Whether the camera path is available at all. This is the check the UI should
+// use. Safari has no BarcodeDetector, so it takes the built in decoder path.
+export function canScan() {
+  return !!(typeof navigator !== 'undefined' &&
+    navigator.mediaDevices &&
+    navigator.mediaDevices.getUserMedia);
+}
+
+export function scanMode() {
+  return supportsNativeScan() ? 'native' : 'builtin';
+}
+
 const WANTED_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'];
 const FRAME_INTERVAL_MS = 140;
+const MAX_FRAME_WIDTH = 800;
 
-// Wraps a video element. Native BarcodeDetector where available.
-// Where it is not available the caller falls back to manual entry, which is a
-// deliberate choice: no scanner library is bundled, so the app stays tiny and
-// fully offline with no third party code.
+// Wraps a video element. Uses the platform BarcodeDetector when it exists,
+// otherwise decodes frames with src/ean.js. Either way the caller gets the same
+// callback, and manual digit entry remains available as a first class path.
 export function createScanner(videoEl) {
   let stream = null;
   let detector = null;
+  let canvas = null;
+  let ctx = null;
   let timer = 0;
   let running = false;
   let lastCode = null;
 
   async function start(onResult, onError) {
     if (running) return true;
-    if (!supportsNativeScan()) {
-      if (onError) onError(new Error('NO_DETECTOR'));
+    if (!canScan()) {
+      if (onError) onError(new Error('NO_CAMERA_API'));
       return false;
     }
     try {
-      const Detector = window.BarcodeDetector;
-      let formats = WANTED_FORMATS;
-      if (Detector.getSupportedFormats) {
-        const available = await Detector.getSupportedFormats();
-        formats = WANTED_FORMATS.filter(function (f) { return available.indexOf(f) >= 0; });
+      if (supportsNativeScan()) {
+        const Detector = window.BarcodeDetector;
+        let formats = WANTED_FORMATS;
+        if (Detector.getSupportedFormats) {
+          const available = await Detector.getSupportedFormats();
+          formats = WANTED_FORMATS.filter(function (f) { return available.indexOf(f) >= 0; });
+        }
+        if (formats.length) detector = new Detector({ formats: formats });
       }
-      if (!formats.length) {
-        if (onError) onError(new Error('NO_FORMATS'));
-        return false;
+      if (!detector) {
+        canvas = document.createElement('canvas');
+        ctx = canvas.getContext('2d', { willReadFrequently: true });
       }
-      detector = new Detector({ formats: formats });
       stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
@@ -86,6 +104,7 @@ export function createScanner(videoEl) {
       });
       videoEl.srcObject = stream;
       videoEl.hidden = false;
+      videoEl.setAttribute('playsinline', '');
       await videoEl.play();
       running = true;
       tick(onResult);
@@ -97,17 +116,38 @@ export function createScanner(videoEl) {
     }
   }
 
+  async function readNative() {
+    const found = await detector.detect(videoEl);
+    if (!found || !found.length) return null;
+    return { raw: found[0].rawValue, format: found[0].format };
+  }
+
+  function readBuiltin() {
+    const vw = videoEl.videoWidth;
+    const vh = videoEl.videoHeight;
+    if (!vw || !vh) return null;
+    const scale = Math.min(1, MAX_FRAME_WIDTH / vw);
+    const w = Math.round(vw * scale);
+    const h = Math.round(vh * scale);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    ctx.drawImage(videoEl, 0, 0, w, h);
+    const hit = decodeFrame(ctx.getImageData(0, 0, w, h), { rows: 9, budgetMs: 60 });
+    return hit ? { raw: hit.code, format: hit.format } : null;
+  }
+
   async function tick(onResult) {
     if (!running) return;
     try {
-      const found = await detector.detect(videoEl);
-      if (found && found.length) {
-        const raw = found[0].rawValue;
-        const code = normalize(raw);
+      const hit = detector ? await readNative() : readBuiltin();
+      if (hit) {
+        const code = normalize(hit.raw);
         if (code && code !== lastCode) {
           lastCode = code;
           if (navigator.vibrate) navigator.vibrate(30);
-          onResult({ code: code, raw: raw, format: found[0].format });
+          onResult({ code: code, raw: hit.raw, format: hit.format, mode: scanMode() });
         }
       }
     } catch (err) {
@@ -135,6 +175,7 @@ export function createScanner(videoEl) {
     start: start,
     stop: stop,
     isRunning: function () { return running; },
-    reset: function () { lastCode = null; }
+    reset: function () { lastCode = null; },
+    mode: scanMode
   };
 }
