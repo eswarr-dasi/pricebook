@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <title>Price Book - what it costs, what is in it, will it fill you up</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>Price Book</h1>
+    <span id="net-pill" class="pill pill-warn" hidden>offline</span>
+  </header>
+
+  <main>
+    <!-- SCAN -->
+    <section id="view-scan" class="view">
+      <div class="scanner">
+        <video id="cam" playsinline muted hidden></video>
+        <div id="scan-hint" class="hint">Scan a barcode, or type it in.</div>
+        <button id="btn-scan" class="primary">Scan barcode</button>
+        <button id="btn-stop" class="ghost" hidden>Stop camera</button>
+      </div>
+
+      <form id="manual-form" class="row">
+        <input id="manual-code" inputmode="numeric" autocomplete="off"
+               placeholder="Barcode digits" aria-label="Barcode digits" />
+        <button class="secondary" type="submit">Look up</button>
+      </form>
+
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <div id="result"></div>
+    </section>
+
+    <!-- PRICE BOOK -->
+    <section id="view-book" class="view" hidden>
+      <div class="row">
+        <input id="book-search" type="search" placeholder="Search your price book" aria-label="Search your price book" />
+        <button id="btn-export" class="secondary" type="button">CSV</button>
+      </div>
+      <p class="muted small">Your lowest price ever paid, per item. Stays on this device.</p>
+      <div id="book-list"></div>
+    </section>
+
+    <!-- SETTINGS / ABOUT -->
+    <section id="view-about" class="view" hidden>
+      <h2>Settings</h2>
+      <label class="field">Default store
+        <input id="set-store" placeholder="e.g. WinCo Bellevue" />
+      </label>
+      <label class="field">People in household
+        <input id="set-household" type="number" min="1" step="1" value="1" />
+      </label>
+
+      <h2>What this app does not do</h2>
+      <ul class="commitments">
+        <li>No good or bad food labels. Numbers only, you decide.</li>
+        <li>No weight goals, no calorie targets, no streaks.</li>
+        <li>No account required. No ads, no affiliate links, no brand influence.</li>
+        <li>Works offline in the aisle.</li>
+        <li>Your price history stays on this device.</li>
+      </ul>
+
+      <h2>Honesty about the numbers</h2>
+      <p class="muted small">
+        Nutrition and ingredients come from Open Food Facts, a community database under the
+        ODbL licence, and can be wrong or out of date. Nutri-Score and NOVA are third party
+        classifications shown as published, not our verdict. The fullness estimate is an
+        estimate built from four visible inputs and is not medical or dietary guidance.
+      </p>
+      <p class="muted small" id="build-line"></p>
+      <button id="btn-wipe" class="danger" type="button">Delete all local data</button>
+    </section>
+  </main>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab is-active" data-view="scan" role="tab">Scan</button>
+    <button class="tab" data-view="book" role="tab">Price book</button>
+    <button class="tab" data-view="about" role="tab">Settings</button>
+  </nav>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
