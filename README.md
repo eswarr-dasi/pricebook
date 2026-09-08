@@ -12,7 +12,7 @@ There is no npm install and no bundler. The app is plain ES modules, so any stat
 
 Then open http://localhost:8080
 
-Camera scanning needs a secure context, so localhost or https only. It also needs a browser with BarcodeDetector, which today means Chrome or Edge on Android and desktop Chrome. Everywhere else the app falls back to typing the digits under the barcode, which is a first class path and not an error state.
+Camera scanning needs a secure context, so localhost or https only. Where the browser has BarcodeDetector, that is used. Where it does not, which today means Safari and therefore every iPhone, the app decodes the camera frames itself using src/ean.js. Typing the digits under the barcode stays a first class path everywhere, not an error state.
 
 To install it on a phone: serve over https, open in Chrome, then Add to home screen. It runs standalone and works offline from then on.
 
@@ -24,11 +24,13 @@ To install it on a phone: serve over https, open in Chrome, then Add to home scr
     icons/icon.svg           app icon
     src/styles.css           styles, mobile first, dark mode aware
     src/barcode.js           barcode normalization and camera scanning
+    src/ean.js               EAN-13, UPC-A and EAN-8 decoder, no dependencies
     src/off.js               Open Food Facts client, cache first
     src/metrics.js           the three value metrics and the satiety estimate
     src/store.js             IndexedDB: product cache, price entries, settings
     src/app.js               UI wiring
     docs/                    product design and research
+    test/index.html          65 assertions that run in the browser, no test runner
 
 ## What phase 1 does
 
@@ -38,13 +40,19 @@ Every price you save writes to a local price book. The app tells you your lowest
 
 Everything is on device. No account, no server, no analytics. CSV export and a delete all button are both in the app.
 
+## Tests
+
+Serve the repo and open test/index.html. 65 assertions, no runner and nothing to install. They cover barcode normalization, the Kroger id transform, size parsing, the value metrics against a real Open Food Facts record, the rule that a missing input never becomes an invented number, and the barcode decoder.
+
+The decoder tests are a real round trip: a barcode is drawn to a canvas and read back from the pixels. The encoder that draws it was itself checked against the platform BarcodeDetector, which read the same bits back correctly, so the tables are not merely self consistent.
+
+Measured against the platform decoder on generated frames, 20 trials each, the built in decoder matched it on clean, tilted to 20 degrees, 1 pixel blur, heavy noise, uneven lighting and single pixel modules, and beat it on short bars that are tilted, where a purely horizontal scan cannot cross the whole symbol. It is worse only under extreme synthetic pixel noise, well past what a lit store produces.
+
 ## What phase 1 does not do yet
 
 No retailer price API, so prices are entered by hand. No receipt import, which is the behavioural bet the whole product rests on and is unproven. No swap suggestions, no pantry cooking, no price alerts, no household sync. No photo calorie estimation, deliberately.
 
 ## Before this is deployed
-
-Add icons/icon-192.png and icons/icon-512.png. The manifest already points at them and the SVG covers most cases, but iOS wants PNGs.
 
 Open Food Facts data is ODbL licensed. The attribution line in the UI is required, so keep it.
 
