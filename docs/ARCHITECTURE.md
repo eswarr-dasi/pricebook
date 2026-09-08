@@ -9,7 +9,7 @@ The moat is not the model, it is the plumbing. Two free upstream sources with ha
 Ship as an installable PWA, not a native app. Barcode scanning works in the browser today and a PWA installs to the home screen with camera access. This avoids app store review, two codebases, the developer fee, and it lets us find out whether anyone wants this before paying for any of that.
 
 - Plain ES modules, one page, no framework and no build step
-- Barcode scan in browser, BarcodeDetector where available, manual digit entry as the fallback
+- Barcode scan in browser, BarcodeDetector where available, our own decoder where it is not
 - Open Food Facts lookup direct from the client, cached on device
 - Price entered manually by the user
 - All state in IndexedDB, no account, no server
@@ -23,14 +23,17 @@ Built, and in this repo. The one deviation from the plan above is the stack: no 
 
 - index.html, one shell, three views
 - src/barcode.js, normalization and the camera loop, plus the Kroger id transform waiting for phase 2
+- src/ean.js, EAN-13, UPC-A and EAN-8 decoder written from the spec, no dependencies
 - src/off.js, Open Food Facts client, cache first, and it ages every cached answer
 - src/metrics.js, the three value metrics and the satiety estimate, weights exported so they can be argued with
 - src/store.js, IndexedDB product cache, price entries, failed scan log, settings
 - src/app.js, UI wiring
 - sw.js, offline shell and data cache
-- test/index.html, assertions that run in the browser with no test runner
+- test/index.html, 65 assertions that run in the browser with no test runner
 
-No scanner library is bundled. Where BarcodeDetector is missing, typing the digits is a first class path rather than an error state. That keeps the whole app small and free of third party code.
+No scanner library is bundled. Safari has no BarcodeDetector, so without a fallback the camera path would be dead on every iPhone. Rather than pull in a WASM decoder and give up the no third party code position, src/ean.js decodes frames directly: it samples pixel lines at several angles and several smoothing levels, reads run lengths, and matches them against the EAN digit patterns. Angles are what make a tilted label decode. Smoothing levels are what let a noisy frame decode without erasing a barcode whose modules are one pixel wide.
+
+It was validated against the platform BarcodeDetector rather than against itself: an encoder generates a known symbol, the platform decoder confirms the bits are a correct EAN-13, and then our decoder has to read the same pixels back. On that benchmark it matches the platform decoder everywhere except extreme synthetic pixel noise, and beats it on short bars that are tilted, because a purely horizontal scan line cannot cross a tilted short symbol end to end. Typical decode is under a millisecond, and a time budget stops a hopeless frame from stalling the camera loop.
 
 ## Phase 2 - the read-through cache
 
