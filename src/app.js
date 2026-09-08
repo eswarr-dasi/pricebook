@@ -8,7 +8,7 @@
 import * as db from './store.js';
 import * as off from './off.js';
 import * as M from './metrics.js';
-import { createScanner, normalize, supportsNativeScan } from './barcode.js';
+import { createScanner, normalize, canScan, scanMode } from './barcode.js';
 
 const $ = function (sel) { return document.querySelector(sel); };
 
@@ -70,9 +70,9 @@ function showView(name) {
 // ---------- scanning ----------
 
 async function startScanning() {
-  if (!supportsNativeScan()) {
+  if (!canScan()) {
     el.hint.textContent =
-      'This browser cannot scan barcodes. Type the digits under the barcode instead.';
+      'This browser will not give the page a camera. Type the digits under the barcode instead.';
     el.manualCode.focus();
     return;
   }
@@ -84,8 +84,8 @@ async function startScanning() {
     el.stopScan.hidden = true;
     if (err && err.name === 'NotAllowedError') {
       say('Camera permission was declined. You can still type the barcode digits.', true);
-    } else if (err && err.message === 'NO_DETECTOR') {
-      say('No barcode support in this browser. Type the digits instead.', true);
+    } else if (err && err.message === 'NO_CAMERA_API') {
+      say('This browser will not give the page a camera. Type the digits instead.', true);
     } else {
       say('Camera unavailable. Type the digits instead.', true);
     }
@@ -419,12 +419,16 @@ async function boot() {
   window.addEventListener('offline', paintNet);
   paintNet();
 
-  if (!supportsNativeScan()) {
+  if (!canScan()) {
     el.hint.textContent =
-      'Camera scanning needs a browser with BarcodeDetector, such as Chrome on Android. ' +
-      'Typing the digits works everywhere.';
+      'This browser will not give the page a camera. Typing the digits works everywhere.';
+  } else if (scanMode() === 'builtin') {
+    el.hint.textContent =
+      'Scan a barcode, or type it in. This browser has no barcode support, so the app decodes frames itself.';
   }
-  el.buildLine.textContent = 'Phase 1 build. No account, no server, no analytics.';
+  el.buildLine.textContent =
+    'Phase 1 build. No account, no server, no analytics. Scanner: ' +
+    (scanMode() === 'native' ? 'platform decoder.' : 'built in decoder.');
 
   renderBook();
 
