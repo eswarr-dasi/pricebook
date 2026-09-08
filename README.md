@@ -2,7 +2,53 @@
 
 A grocery app that answers three questions in one scan: what does this cost at my store, what is actually in it, and will it keep me full.
 
-Status: product design. No code yet.
+Status: phase 1 app. Running code, no backend, no build step.
+
+## Run it
+
+There is no npm install and no bundler. The app is plain ES modules, so any static file server works.
+
+    python3 -m http.server 8080
+
+Then open http://localhost:8080
+
+Camera scanning needs a secure context, so localhost or https only. It also needs a browser with BarcodeDetector, which today means Chrome or Edge on Android and desktop Chrome. Everywhere else the app falls back to typing the digits under the barcode, which is a first class path and not an error state.
+
+To install it on a phone: serve over https, open in Chrome, then Add to home screen. It runs standalone and works offline from then on.
+
+## Repo layout
+
+    index.html               app shell and all markup
+    manifest.webmanifest     PWA manifest
+    sw.js                    service worker, offline shell and data cache
+    icons/icon.svg           app icon
+    src/styles.css           styles, mobile first, dark mode aware
+    src/barcode.js           barcode normalization and camera scanning
+    src/off.js               Open Food Facts client, cache first
+    src/metrics.js           the three value metrics and the satiety estimate
+    src/store.js             IndexedDB: product cache, price entries, settings
+    src/app.js               UI wiring
+    docs/                    product design and research
+
+## What phase 1 does
+
+Scan a barcode, or type it. Nutrition and ingredients come from Open Food Facts and are cached on the device. Enter the price you see on the shelf. The app shows cost per serving, cents per gram of protein, and fullness per dollar, plus cost per 100 g, calories per serving and calories per dollar.
+
+Every price you save writes to a local price book. The app tells you your lowest price ever paid for that item, comparing on price per 100 g when sizes are known, because the same item in two sizes is not the same deal. Items missing from Open Food Facts can still be added by hand, which is what makes this usable at Costco, Aldi, Trader Joes and WinCo.
+
+Everything is on device. No account, no server, no analytics. CSV export and a delete all button are both in the app.
+
+## What phase 1 does not do yet
+
+No retailer price API, so prices are entered by hand. No receipt import, which is the behavioural bet the whole product rests on and is unproven. No swap suggestions, no pantry cooking, no price alerts, no household sync. No photo calorie estimation, deliberately.
+
+## Before this is deployed
+
+Add icons/icon-192.png and icons/icon-512.png. The manifest already points at them and the SVG covers most cases, but iOS wants PNGs.
+
+Open Food Facts data is ODbL licensed. The attribution line in the UI is required, so keep it.
+
+Read the Kroger API terms of service before wiring any price integration. Only the API reference has been reviewed, not the legal terms.
 
 ## The problem
 
@@ -24,9 +70,7 @@ Neither app tells you what it costs, whether you will be full, what to cook from
 
 One question: was this worth it. Measured in money, fullness and nutrition together.
 
-The metric is cost per gram of protein, calories per dollar, and fullness per dollar. That reframes food scanning away from moral judgment and away from obsessive counting, toward value.
-
-No good or bad labels anywhere. Nutri-Score and NOVA appear as cited third party classifications with a link to their methodology, never as our verdict.
+No good or bad labels anywhere. Nutri-Score and NOVA appear as cited third party classifications with a link to their methodology, never as our verdict. No weight goals, no calorie targets, no streaks.
 
 ## What makes it defensible
 
@@ -36,9 +80,12 @@ This technique already has organic demand. A post titled I stopped chasing every
 
 ## Docs
 
-- docs/PRODUCT.md - features, user flows, what we deliberately do not build
-- - docs/DATA_SOURCES.md - verified free data sources and their limits
-  - - docs/ARCHITECTURE.md - system design and caching strategy
-    - - docs/COMPETITIVE.md - research findings with sources
-      - - docs/ROADMAP.md - three phases, kill criteria, open questions
-        - 
+docs/PRODUCT.md - features, user flows, what we deliberately do not build
+
+docs/DATA_SOURCES.md - verified free data sources and their limits
+
+docs/ARCHITECTURE.md - system design and caching strategy
+
+docs/COMPETITIVE.md - research findings with sources
+
+docs/ROADMAP.md - three phases, kill criteria, open questions
