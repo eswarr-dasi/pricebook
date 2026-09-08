@@ -5,7 +5,7 @@
 // Open Food Facts: network first with a cache fallback, and off.js separately
 // keeps its own copy in IndexedDB with a timestamp so the UI can show the age.
 
-const VERSION = 'pricebook-v1';
+const VERSION = 'pricebook-v2';
 const SHELL_CACHE = VERSION + '-shell';
 const DATA_CACHE = VERSION + '-data';
 
@@ -19,6 +19,7 @@ const SHELL = [
   './src/store.js',
   './src/off.js',
   './src/metrics.js',
+  './src/ean.js',
   './src/barcode.js'
 ];
 
