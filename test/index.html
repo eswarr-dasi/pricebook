@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Price Book tests</title>
+  <style>
+    body { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 24px; }
+    .pass { color: #065f46; }
+    .fail { color: #b91c1c; font-weight: 700; }
+    h1 { font-size: 18px; }
+    #summary { margin: 16px 0; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Price Book tests</h1>
+  <p>No test runner, no npm. Serve the repo and open this page.</p>
+  <div id="summary">running...</div>
+  <div id="out"></div>
+
+  <script type="module">
+    import * as M from '../src/metrics.js';
+    import { normalize, isValidEan13, toKrogerProductId, checkDigit, digitsOnly } from '../src/barcode.js';
+
+    const out = document.getElementById('out');
+    let pass = 0;
+    let fail = 0;
+
+    function log(ok, name, detail) {
+      const div = document.createElement('div');
+      div.className = ok ? 'pass' : 'fail';
+      div.textContent = (ok ? 'PASS  ' : 'FAIL  ') + name + (detail ? '   ' + detail : '');
+      out.appendChild(div);
+      if (ok) pass++; else fail++;
+    }
+
+    function eq(name, actual, expected) {
+      const ok = actual === expected;
+      log(ok, name, ok ? '' : 'got ' + JSON.stringify(actual) + ' want ' + JSON.stringify(expected));
+    }
+
+    function near(name, actual, expected, tol) {
+      const t = tol == null ? 0.01 : tol;
+      const ok = actual != null && Math.abs(actual - expected) <= t;
+      log(ok, name, ok ? '' : 'got ' + actual + ' want ' + expected + ' +/- ' + t);
+    }
+
+    // ---------- barcode ----------
+    eq('digitsOnly strips junk', digitsOnly('  038-000 138416 '), '038000138416');
+    eq('UPC-A is padded to EAN-13', normalize('038000138416'), '0038000138416');
+    eq('EAN-13 passes through', normalize('0038000138416'), '0038000138416');
+    eq('EAN-8 passes through', normalize('96385074'), '96385074');
+    eq('GTIN-14 drops the indicator', normalize('10038000138416'), '0038000138416');
+    eq('nonsense is rejected', normalize('12345'), null);
+    eq('empty is rejected', normalize(''), null);
+    eq('check digit is computed', checkDigit('003800013841'), 6);
+    eq('real barcode validates', isValidEan13('0038000138416'), true);
+    eq('corrupted barcode fails', isValidEan13('0038000138417'), false);
+    eq('Kroger id omits the check digit', toKrogerProductId('0038000138416'), '0003800013841');
+    eq('Kroger id is 13 digits', toKrogerProductId('0038000138416').length, 13);
+
+    // ---------- quantity parsing ----------
+    near('ounces to grams', M.parseQuantity('5.2 oz'), 147.42, 0.01);
+    near('pounds to grams', M.parseQuantity('2 lb'), 907.18, 0.01);
+    near('fluid ounces to ml', M.parseQuantity('12 fl oz'), 354.88, 0.01);
+    eq('kilograms to grams', M.parseQuantity('1.5 kg'), 1500);
+    eq('litres to ml', M.parseQuantity('1,5 l'), 1500);
+    eq('grams stay grams', M.parseQuantity('500 g'), 500);
+    eq('serving text is parsed', M.parseQuantity('1 serving (28 g)'), 28);
+    eq('unparseable size is null', M.parseQuantity('one packet'), null);
+    eq('missing size is null', M.parseQuantity(''), null);
+
+    // ---------- fixture ----------
+    // Real Open Food Facts record, code 0038000138416, captured for the fixture.
+    const pringles = {
+      code: '0038000138416',
+      product_name: 'Original Potato Crisps',
+      brands: 'Pringles',
+      quantity: '5.2 oz',
+      product_quantity: 147.41752025,
+      serving_size: '1 serving (28 g)',
+      serving_quantity: 28,
+      nutriments: {
+        'energy-kcal_100g': 536,
+        proteins_100g: 3.5,
+        fiber_100g: 4,
+        fat_100g: 32,
+        carbohydrates_100g: 57,
+        sugars_100g: 1,
+        salt_100g: 1.34,
+        'saturated-fat_100g': 9
+      }
+    };
+
+    near('package grams', M.packageGrams(pringles), 147.42, 0.01);
+    eq('serving grams', M.servingGrams(pringles), 28);
+    near('servings per package', M.servingsPerPackage(pringles), 5.26, 0.01);
+
+    const c = M.compute(pringles, 4.29, { household: 1 });
+    near('cost per serving', c.costPerServing, 0.815, 0.002);
+    near('cost per 100 g', c.costPer100g, 2.91, 0.01);
+    near('protein in package', c.totalProtein, 5.16, 0.01);
+    near('cents per gram of protein', c.costPerGramProtein * 100, 83.1, 0.2);
+    near('calories in package', c.totalKcal, 790, 1);
+    near('calories per dollar', c.kcalPerDollar, 184, 1);
+    eq('nothing is missing for this fixture', c.missing.length, 0);
+
+    const sat = M.satiety(pringles);
+    eq('satiety is always flagged as an estimate', sat.isEstimate, true);
+    near('satiety score', sat.score, 13, 1);
+    log(sat.low < sat.score && sat.high > sat.score, 'satiety carries an uncertainty range',
+        sat.low + ' to ' + sat.high);
+    eq('satiety exposes its energy density input', sat.inputs.energyDensity, 5.36);
+    eq('satiety exposes its protein input', sat.inputs.protein, 3.5);
+    eq('satiety exposes its fiber input', sat.inputs.fiber, 4);
+    near('fullness per dollar', c.fullnessPerDollar, 16, 1);
+
+    // ---------- household ----------
+    const c4 = M.compute(pringles, 4.29, { household: 4 });
+    near('cost to feed four', c4.costForHousehold, c.costPerServing * 4, 0.002);
+
+    // ---------- missing data must not invent numbers ----------
+    const bare = { code: '1', nutriments: {} };
+    const cb = M.compute(bare, 3.0, {});
+    eq('no serving size means no cost per serving', cb.costPerServing, null);
+    eq('no protein means no protein price', cb.costPerGramProtein, null);
+    eq('no nutrition means no satiety estimate', cb.satiety, null);
+    log(cb.missing.length >= 4, 'missing inputs are reported', cb.missing.join(', '));
+    eq('a null number formats as a dash, not a zero', M.money(null), M.DASH);
+    eq('a real number formats as money', M.money(0.8149), '$0.81');
+
+    // ---------- no price means no value metrics ----------
+    const noPrice = M.compute(pringles, null, {});
+    eq('no price means no cost per serving', noPrice.costPerServing, null);
+    eq('no price still gives nutrition', noPrice.per100.protein, 3.5);
+
+    const s = document.getElementById('summary');
+    s.textContent = pass + ' passed, ' + fail + ' failed';
+    s.className = fail ? 'fail' : 'pass';
+  </script>
+</body>
+</html>
