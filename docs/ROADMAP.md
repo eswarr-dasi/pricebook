@@ -14,7 +14,7 @@ Scope, roughly one weekend:
 - Local price book with personal best price
 
 Out of scope: retailer API, receipts, swaps, photos, sync, accounts.
-Status: all of the above is built and committed. What is not yet done: PNG icons for iOS, a static host, and the landing page used for validation. Nothing in phase 1 has been put in front of a stranger yet, so none of the validation below has actually happened.
+Status: all of the above is built and committed, including icons and a barcode decoder that works on iPhone. What is not yet done: a static host and the landing page used for validation. Nothing has been put in front of a stranger yet, so none of the validation below has actually happened.
 
 Validation before writing code: a landing page with three example scans. If a hundred people scan something in the first week, continue.
 
