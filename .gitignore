@@ -1,0 +1,16 @@
+.DS_Store
+*.log
+
+# Local preview scratch, never part of the app
+__*.html
+__*.svg
+__*.css
+
+# Android packaging output. The keystore in particular must never be committed:
+# losing it means you can never update the app on Play, and leaking it means
+# someone else can sign as you.
+/android/
+*.keystore
+*.jks
+*.aab
+*.apk

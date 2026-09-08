@@ -17,7 +17,7 @@
 //   keeps its own copy in IndexedDB with a timestamp, so the UI can always say
 //   how old a price or a record is.
 
-const VERSION = 'pricebook-v3';
+const VERSION = 'tare-v14';
 const SHELL_CACHE = VERSION + '-shell';
 const DATA_CACHE = VERSION + '-data';
 
@@ -28,13 +28,17 @@ const SHELL = [
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './icons/icon-512-maskable.png',
+  './icons/icon-maskable.svg',
   './src/styles.css',
   './src/app.js',
   './src/store.js',
   './src/off.js',
   './src/metrics.js',
   './src/ean.js',
-  './src/barcode.js'
+  './src/barcode.js',
+  './src/motion.js',
+  './src/palette.js'
 ];
 
 // Resolved once against this worker scope so a request can be classified by

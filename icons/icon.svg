@@ -1,14 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Price Book">
-  <rect width="512" height="512" rx="96" fill="#111827"/>
-  <g fill="#ffffff">
-    <rect x="104" y="148" width="26" height="216"/>
-    <rect x="146" y="148" width="12" height="216"/>
-    <rect x="174" y="148" width="34" height="216"/>
-    <rect x="224" y="148" width="12" height="216"/>
-    <rect x="252" y="148" width="26" height="216"/>
-    <rect x="294" y="148" width="12" height="216"/>
-    <rect x="322" y="148" width="38" height="216"/>
-    <rect x="376" y="148" width="12" height="216"/>
-    <rect x="104" y="392" width="284" height="18" rx="9"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"
+     role="img" aria-label="Tare">
+  <title>Tare</title>
+  <desc>A weighing pan, for the tare button that subtracts the container. Standing in it, bars whose widths are a barcode and whose heights are a price history.</desc>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#241a52"/><stop offset="1" stop-color="#0d0a1e"/></linearGradient></defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <rect x="170.0" y="172.0" width="20.0" height="150.0" rx="4.0" fill="#7048d8"/><rect x="198.0" y="226.0" width="11.0" height="96.0" rx="4.0" fill="#2a78d6"/><rect x="217.0" y="130.0" width="26.0" height="192.0" rx="4.0" fill="#12946a"/><rect x="251.0" y="198.0" width="11.0" height="124.0" rx="4.0" fill="#178c2e"/><rect x="274.0" y="110.0" width="20.0" height="212.0" rx="4.0" fill="#b07b00"/><rect x="302.0" y="176.0" width="11.0" height="146.0" rx="4.0" fill="#d9541f"/><rect x="321.0" y="210.0" width="26.0" height="112.0" rx="4.0" fill="#d6437f"/><path d="M104.0 322.0 H408.0 c-14.0 54.0 -74.0 84.0 -152.0 84.0 s-138.0 -30.0 -152.0 -84.0 Z" fill="#ffffff"/><rect x="238.0" y="404.0" width="36.0" height="26.0" rx="4.0" fill="#ffffff" opacity=".85"/>
 </svg>

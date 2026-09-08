@@ -158,12 +158,17 @@ function decodeDigit(row, offset, allowB) {
   };
 }
 
+// Weights run 3, 1, 3, 1 leftwards from the digit beside the check digit, so
+// they are anchored to the right hand end, not the left. An even length body
+// (EAN-13, 12 digits) therefore starts on 1 and an odd one (EAN-8, 7 digits)
+// starts on 3. Anchoring on the left instead silently rejects most real EAN-8.
 export function checkDigitOk(code) {
+  const last = code.length - 1;
   let sum = 0;
-  for (let i = 0; i < code.length - 1; i++) {
-    sum += Number(code[i]) * (i % 2 === 0 ? 1 : 3);
+  for (let i = 0; i < last; i++) {
+    sum += Number(code[i]) * ((last - i) % 2 === 1 ? 3 : 1);
   }
-  return (10 - (sum % 10)) % 10 === Number(code[code.length - 1]);
+  return (10 - (sum % 10)) % 10 === Number(code[last]);
 }
 
 // A UPC-A symbol is physically an EAN-13 with an implied leading zero, so this

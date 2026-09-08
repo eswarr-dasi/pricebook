@@ -12,6 +12,10 @@ Scope, roughly one weekend:
 - Manual price entry
 - The three value metrics: cost per serving, cost per gram of protein, fullness per dollar
 - Local price book with personal best price
+- Scan history and favourites
+- Product score, 0 to 100, always shown with its itemised reasons
+- Daily log with user-set energy and macro targets, optional streak, weight log
+- Swaps drawn from the user's own scanned corpus
 
 Out of scope: retailer API, receipts, swaps, photos, sync, accounts.
 Status: all of the above is built and committed, including icons and a barcode decoder that works on iPhone. What is not yet done: a static host and the landing page used for validation. Nothing has been put in front of a stranger yet, so none of the validation below has actually happened.
@@ -60,7 +64,9 @@ Instead, show up where the behaviour already exists:
 
 - Comment on the existing r/Frugal price book threads rather than launching. That community has 261 people commenting on a single price book post.
 - r/EatCheapAndHealthy and r/povertyfinance, framed around cost per meal, never around weight.
-- Position as the spreadsheet replacement, not as a Yuka or Cal AI competitor.
+- Position as the spreadsheet replacement first. The score and the daily log make
+  the app legible to people arriving from Yuka and Cal AI, but the price book is
+  still the reason to stay, and the pitch leads with cost, not with grading.
 - Skip Product Hunt. Research on comparable small tools found directories and launch sites underperformed personal outreach to niche communities.
 
 ## Open questions
@@ -80,4 +86,11 @@ Open Food Facts is donation funded and was publicly short of budget for 2026. Mi
 
 Receipt OCR is the hardest part and it is also the differentiator. There is a real chance it is not good enough, which is why phase 1 does not depend on it.
 
-Anything touching food and body weight can feed disordered eating. The deliberate absence of weight goals, calorie targets and streaks is a safety decision, not a scoping one, and should not be reversed for growth.
+Anything touching food and body weight can feed disordered eating. Weight goals,
+calorie targets, streaks and a graded score were originally absent for that
+reason. That was reversed by product decision on 2026-09-07, so the risk is now
+accepted rather than avoided, and it is carried by mitigations instead: targets
+are user-set and never derived from body data, streaks are optional and silent
+when broken, the score never appears without its reasons, and nothing compares
+the user to anyone else. See the reversal note in PRODUCT.md. This is the risk
+on this list most likely to require a product change after real usage.

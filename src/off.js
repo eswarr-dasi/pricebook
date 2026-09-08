@@ -21,10 +21,15 @@ export const FIELDS = [
   'serving_quantity',
   'ingredients_text',
   'allergens_tags',
+  'additives_tags',
+  'additives_n',
   'nutriments',
   'nutriscore_grade',
   'nova_group',
   'categories_tags',
+  'labels_tags',
+  'ingredients_analysis_tags',
+  'traces_tags',
   'image_front_small_url'
 ].join(',');
 
@@ -44,10 +49,15 @@ function pick(raw) {
     serving_quantity: raw.serving_quantity == null ? null : Number(raw.serving_quantity),
     ingredients_text: raw.ingredients_text || '',
     allergens_tags: raw.allergens_tags || [],
+    additives_tags: raw.additives_tags || [],
+    additives_n: raw.additives_n == null ? null : Number(raw.additives_n),
     nutriments: raw.nutriments || {},
     nutriscore_grade: raw.nutriscore_grade || null,
     nova_group: raw.nova_group == null ? null : Number(raw.nova_group),
     categories_tags: raw.categories_tags || [],
+    labels_tags: raw.labels_tags || [],
+    ingredients_analysis_tags: raw.ingredients_analysis_tags || [],
+    traces_tags: raw.traces_tags || [],
     image: raw.image_front_small_url || null,
     attribution: 'Open Food Facts, ODbL'
   };
@@ -112,6 +122,40 @@ export async function lookup(code, opts) {
       };
     }
     throw err;
+  }
+}
+
+// Free text search. The v2 endpoint needs structured filters, so name search
+// goes through the legacy cgi endpoint, which is the one that accepts words.
+// Results are deliberately not cached: a search is a question, not a record.
+const SEARCH = 'https://world.openfoodfacts.org/cgi/search.pl';
+
+export async function searchByName(terms, opts) {
+  const options = opts || {};
+  const controller = new AbortController();
+  const timer = setTimeout(function () { controller.abort(); }, TIMEOUT_MS);
+  try {
+    const url = SEARCH +
+      '?search_terms=' + encodeURIComponent(terms) +
+      '&search_simple=1&action=process&json=1' +
+      '&page_size=' + (options.limit || 20) +
+      '&fields=' + encodeURIComponent('code,product_name,brands,quantity,image_front_small_url');
+    const res = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('OFF_HTTP_' + res.status);
+    const body = await res.json();
+    return (body.products || [])
+      .filter(function (p) { return p.code && p.product_name; })
+      .map(function (p) {
+        return {
+          code: String(p.code),
+          name: p.product_name,
+          brand: p.brands || '',
+          quantity: p.quantity || '',
+          image: p.image_front_small_url || null
+        };
+      });
+  } finally {
+    clearTimeout(timer);
   }
 }
 

@@ -1,4 +1,4 @@
-# pricebook
+# tare
 
 A grocery app that answers three questions in one scan: what does this cost at my store, what is actually in it, and will it keep me full.
 
@@ -8,7 +8,7 @@ Status: phase 1 app. Running code, no backend, no build step.
 
 There is no npm install and no bundler. The app is plain ES modules, so any static file server works. Start the server in the folder that holds index.html, not the folder above it, or every path will be off by one.
 
-    cd pricebook
+    cd tare
     python3 -m http.server 8080
 
 Then open http://localhost:8080. Double clicking index.html will not work, because ES modules do not load from a file:// URL.
