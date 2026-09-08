@@ -6,11 +6,14 @@ Status: phase 1 app. Running code, no backend, no build step.
 
 ## Run it
 
-There is no npm install and no bundler. The app is plain ES modules, so any static file server works.
+There is no npm install and no bundler. The app is plain ES modules, so any static file server works. Start the server in the folder that holds index.html, not the folder above it, or every path will be off by one.
 
+    cd pricebook
     python3 -m http.server 8080
 
-Then open http://localhost:8080
+Then open http://localhost:8080. Double clicking index.html will not work, because ES modules do not load from a file:// URL.
+
+The camera is only requested when you tap Scan. Nothing asks for it on load, and typing the digits under the barcode never asks for it at all.
 
 Camera scanning needs a secure context, so localhost or https only. Where the browser has BarcodeDetector, that is used. Where it does not, which today means Safari and therefore every iPhone, the app decodes the camera frames itself using src/ean.js. Typing the digits under the barcode stays a first class path everywhere, not an error state.
 
@@ -42,7 +45,9 @@ Everything is on device. No account, no server, no analytics. CSV export and a d
 
 ## Tests
 
-Serve the repo and open test/index.html. 65 assertions, no runner and nothing to install. They cover barcode normalization, the Kroger id transform, size parsing, the value metrics against a real Open Food Facts record, the rule that a missing input never becomes an invented number, and the barcode decoder.
+Serve the repo and open http://localhost:8080/test/index.html. 65 assertions, no runner and nothing to install. They cover barcode normalization, the Kroger id transform, size parsing, the value metrics against a real Open Food Facts record, the rule that a missing input never becomes an invented number, and the barcode decoder.
+
+If that page sits on "running..." then something failed before the assertions ran. It now says what: it names the module it could not load, lists any export that has gone missing, rejects a file:// URL with the reason, and gives up after ten seconds instead of looking busy forever. It also prints which camera path the current browser would take.
 
 The decoder tests are a real round trip: a barcode is drawn to a canvas and read back from the pixels. The encoder that draws it was itself checked against the platform BarcodeDetector, which read the same bits back correctly, so the tables are not merely self consistent.
 
